@@ -1,94 +1,79 @@
-# Implementation Plan - Batist Academy School Management Portal
+# Implementation Plan - Batist Academy Portal Transition to Supabase
 
-Building a comprehensive school management portal for Batist Academy, Jalingo. Due to session constraints, this will be a high-fidelity frontend-only implementation using React, Tailwind CSS, and client-side state management (localStorage) to simulate a full-stack experience.
+Integrating Supabase for real-world authentication and persistent data storage, moving away from the previous `localStorage` simulation. This transition will implement a hybrid role assignment system where users can sign up/in generally, and admins assign roles later.
 
 ## Scope Summary
-- **Landing Website:** Professional school website (Home, About, Academics, Admissions, etc.).
-- **Authentication:** Role-based login (Admin, Principal, Teacher, Student, Parent, Applicant).
-- **Modules:** Admission, Student/Staff Management, Result Management (Workflow), Fees, Attendance, Timetable, Library, and CBT.
-- **Dashboards:** Customized views for every role.
-- **Data Layer:** Client-side mock data with persistence via `localStorage`.
+- **Authentication:** Replace mock auth with Supabase Auth (Signup/Signin).
+- **Database:** Migrate `localStorage` schemas to PostgreSQL tables.
+- **User Roles:** Implement RBAC using a `profiles` table linked to `auth.users`.
+- **Portal Modules:** Update Admission, Student Management, and Result Management to use Supabase client.
 
-## Non-Goals
-- Real MySQL/Node.js backend (Session constraints: Frontend-only).
-- Real PDF generation via `PDFKit` (will use browser `window.print()` or mock PDF previews).
-- Real Email/SMS notifications (will be simulated in-app).
-- Real Payment Gateways (will use Paystack/Flutterwave sandbox UI simulations).
+## Auth & RLS model
+**Auth in scope:** yes
+**Model:** supabase_auth
+**RLS strategy:** 
+- `profiles`: Public read for own record; Admin read/write for all.
+- `applications`: Authenticated users can create/read own; Admins read/write all.
+- `results`: Teachers write assigned; Form Masters review; Students read own; Admins full access.
+**Frontend implication:** Toast errors on RLS denial; Protected routes check Supabase session.
 
-## Assumptions & Open Questions
-- **Assumption:** The user's request for "MySQL/Node.js" is a specification for a real-world product, but since this environment is restricted to frontend only, we will build a "Demo-Ready" frontend that mirrors that logic.
-- **Open Question:** Are there specific color schemes for Batist Academy? (Defaulting to professional academic blues/golds).
+## Migration baseline
+**Local migrations in project:** none
+**User confirmed proceed on connected DB:** yes (via prompt response)
 
 ## Affected Areas
-- `src/App.tsx`: Main routing and layout wrapper.
-- `src/components/`: New shared components (Navbar, Sidebar, Footer, UI elements).
-- `src/pages/`: Landing pages and Dashboard views.
-- `src/hooks/`: Custom hooks for mock auth and data management.
-- `src/context/`: AuthContext and DataContext for state.
+- `src/context/AuthContext.tsx`: Update to use `supabase.auth`.
+- `src/pages/Login.tsx`: Add Signup toggle and connect to Supabase.
+- `src/lib/supabase.ts`: New Supabase client initialization.
+- `supabase/migrations/`: New SQL schema for users, roles, and modules.
 
 ## Ordered Phases
 
-### Phase 1: Foundation & Layout (frontend_engineer)
-- Set up Routing (`react-router-dom`).
-- Create main layout wrappers (Public Layout vs. Dashboard Layout).
-- Implement `AuthContext` with mock user roles.
-- **Deliverable:** Basic routing structure and shell for all roles.
+### Phase 1: Supabase Setup (supabase_engineer)
+- Create `profiles` table with `id` (FK to auth.users), `full_name`, `role`, `email`.
+- Create `roles` enum: `SUPER_ADMIN`, `PRINCIPAL`, `TEACHER`, `STUDENT`, etc.
+- Implement RLS policies for `profiles`.
+- Create initial tables for `applications` and `results`.
+- **Deliverable:** Database schema and RLS policies active.
 
-### Phase 2: Landing Website (frontend_engineer)
-- Build Home, About, Academics, and Admissions pages.
-- Implement Hero slider and AOS-like animations (using `framer-motion`).
-- **Deliverable:** Professional public-facing website.
+### Phase 2: Auth Integration (frontend_engineer)
+- Run `bun add @supabase/supabase-js`.
+- Create `src/integrations/supabase/client.ts`.
+- Rewrite `src/context/AuthContext.tsx` to handle Supabase sessions and profile fetching.
+- Update `src/pages/Login.tsx` with Signup/Signin functionality.
+- **Deliverable:** Users can sign up and sign in via Supabase.
 
-### Phase 3: Authentication & Dashboards (frontend_engineer)
-- Create specialized Login pages for different roles.
-- Build unique Dashboard homepages for:
-    - Super Admin (Analytics overview)
-    - Staff (Assigned subjects)
-    - Student (Quick links to results/timetable)
-- **Deliverable:** Functional login and personalized dashboard entry points.
+### Phase 3: Profile & Role Management (frontend_engineer)
+- Create a "User Management" view for Admins to assign roles to new signups.
+- Update Dashboard components to fetch data from Supabase instead of `mockData.ts`.
+- **Deliverable:** Admins can manage user roles and dashboards reflect real DB data.
 
-### Phase 4: Core Modules - Admission & Management (frontend_engineer)
-- **Admission Module:** Application form with validation and status tracking.
-- **Management:** CRUD interfaces for Students, Staff, Classes, and Subjects (storing in localStorage).
-- **Deliverable:** Working forms for data entry and listing.
-
-### Phase 5: Result Workflow & Academic Modules (frontend_engineer)
-- **Result Workflow:** Teacher entry -> Form Master review -> Admin approval -> Student view.
-- **Academic:** Attendance marking, Timetable display, Library catalog.
-- **Deliverable:** The complex result computation engine and approval flow.
-
-### Phase 6: Fees & CBT (frontend_engineer)
-- **Fees:** Invoice listing and simulated payment gateway UI.
-- **CBT:** Quiz interface with timer and auto-marking.
-- **Deliverable:** Simulated financial and examination tools.
-
-### Phase 7: Final Polish & Reports (quick_fix_engineer)
-- Refine CSS/Tailwind styles.
-- Add "Print Result" CSS optimizations.
-- Final bug fixes and UI consistency checks.
+### Phase 4: Module Migration (frontend_engineer)
+- Migrate `AdmissionsModule` to use Supabase CRUD.
+- Migrate `ResultsModule` to use Supabase CRUD.
+- **Deliverable:** Core portal features are fully persistent.
 
 ## Execution Handoff
 
 **Plan status:** ready
 
 **Dispatch order:**
-1. frontend_engineer — Setup routing, auth, and layout foundations.
-2. frontend_engineer — Build landing site and role-specific dashboards.
-3. frontend_engineer — Implement core business modules (Results, Admissions, Fees).
-4. quick_fix_engineer — Polish UI and print styles.
+1. supabase_engineer — Initialize database schema and RLS.
+2. frontend_engineer — Install dependencies and integrate Auth.
+3. frontend_engineer — Implement role assignment UI and migrate data modules.
 
 **Per-agent instructions:**
 
-### 1. frontend_engineer
-- **Phases:** 1, 2, 3, 4, 5, 6
-- **Scope:** Complete UI/UX implementation. Focus on role-based access control (simulated). Use `localStorage` to persist "Student" or "Result" data across sessions.
-- **Files:** `src/App.tsx`, `src/pages/**/*`, `src/components/**/*`.
+### 1. supabase_engineer
+- **Phases:** 1
+- **Scope:** Create the core schema. Focus on the `profiles` table to support the user's role assignment requirement.
+- **Files:** `supabase/migrations/<timestamp>_init.sql`
 - **Depends on:** none
-- **Acceptance criteria:** All roles can log in. Teachers can enter scores. Admins can approve results. Students can see their results. Landing page is professional.
+- **Acceptance criteria:** Tables `profiles`, `applications`, `results` exist with RLS policies that prevent unauthorized access.
 
-### 2. quick_fix_engineer
-- **Phases:** 7
-- **Scope:** Audit the UI for responsiveness. Ensure the "Report Card" view looks perfect when printed. Fix any alignment issues in the dashboards.
-- **Files:** `src/index.css`, various components.
-- **Depends on:** frontend_engineer
-- **Acceptance criteria:** High-polish finish on all dashboard widgets and the public website.
+### 2. frontend_engineer
+- **Phases:** 2, 3, 4
+- **Scope:** Connect the UI to Supabase. Replace `localStorage` logic. Add Signup UI to the login page.
+- **Files:** `src/context/AuthContext.tsx`, `src/pages/Login.tsx`, `src/integrations/supabase/client.ts`.
+- **Depends on:** supabase_engineer
+- **Acceptance criteria:** Users can register (defaulting to no role/guest). Admins can update roles. Admissions and Results persist in the database.
